@@ -2,7 +2,7 @@
 
 A Python-based weather display application for Waveshare e-ink displays (2.13" V4). Features professional weather icons, modern typography, and automatic updates.
 
-![Weather Display](assets/display-preview.png)
+![Weather Display](assets/weather_eink.jpg)
 
 ## Features
 
