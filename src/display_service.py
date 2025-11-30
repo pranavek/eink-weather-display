@@ -118,8 +118,14 @@ class DisplayService:
         # Column width = width / 3
         col_width = width // 3
         
-        for i in range(min(3, len(daily_time))):
-            day_x = i * col_width
+        # Skip today (index 0), show next 3 days (indices 1, 2, 3)
+        start_idx = 1
+        end_idx = min(start_idx + 3, len(daily_time))
+        
+        for i in range(start_idx, end_idx):
+            # Calculate display index (0, 1, 2) for positioning
+            display_i = i - start_idx
+            day_x = display_i * col_width
             
             # Date -> Day name
             date_str = daily_time[i]
