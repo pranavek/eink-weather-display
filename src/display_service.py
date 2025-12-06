@@ -101,7 +101,7 @@ class DisplayService:
             ix = round(d / (360. / len(dirs)))
             return dirs[ix % len(dirs)]
         wind_cardinal = get_cardinal(wind_dir)
-        draw.text((65, 40), f"W: {wind_kmh} km/h ({int(wind_mph)} mph) {wind_cardinal}", font=self.font_detail, fill=0)
+        draw.text((65, 40), f"W: {int(wind_mph)} mph {wind_cardinal}", font=self.font_detail, fill=0)
 
         # Divider between top and bottom
         draw.line((0, 65, width, 65), fill=0, width=2)

@@ -7,8 +7,8 @@ A Python-based weather display application for Waveshare e-ink displays (2.13" V
 ## Features
 
 - 📊 **Current Weather** - Temperature (°C/°F), wind speed (km/h & mph), and conditions
-- 📅 **3-Day Forecast** - Daily high/low temperatures with weather icons
-- 🎨 **Professional Design** - Weather-icons font for icons, Montserrat font for text
+- ℹ️ **Details & Recommendations** - UV, Sunset, Feels Like, and smart recommendations
+- 🎨 **Professional Design** - Weather-icons font for icons, Georgia font for text
 - 🌓 **Day/Night Icons** - Appropriate weather icons based on time of day
 - 🔄 **Auto-Updates** - Refreshes every 60 minutes
 - 🌍 **Multi-Location** - Support for multiple locations (configurable)
@@ -148,7 +148,7 @@ This project uses the [Open-Meteo API](https://open-meteo.com/) which is free an
 
 The display is divided into two sections:
 - **Top Half**: Current weather with large icon, temperature, and wind information
-- **Bottom Half**: 3-day forecast with day names, icons, and high/low temperatures
+- **Bottom Half**: Daily details (UV, Sunset, Feels Like) and recommendations (Umbrella, Clothing)
 
 ### Update Frequency
 
@@ -166,9 +166,9 @@ time.sleep(60 * 60)  # Change this value
 Edit `src/display_service.py` to adjust font sizes:
 
 ```python
-self.font_temp = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 36)  # Temperature
-self.font_detail = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Regular.ttf"), 18)  # Details
-self.font_forecast = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 22)  # Forecast
+self.font_temp = ImageFont.truetype(os.path.join(font_dir, "georgiab.ttf"), 36)  # Temperature
+self.font_detail = ImageFont.truetype(os.path.join(font_dir, "georgia.ttf"), 18)  # Details
+self.font_forecast = ImageFont.truetype(os.path.join(font_dir, "georgiab.ttf"), 22)  # Forecast
 ```
 
 ### Icon Sizes
@@ -224,7 +224,7 @@ The application uses the weather-icons font with WMO weather codes:
 
 - **Weather Data**: [Open-Meteo API](https://open-meteo.com/)
 - **Weather Icons**: [erikflowers/weather-icons](https://github.com/erikflowers/weather-icons)
-- **Font**: [Montserrat by Google Fonts](https://fonts.google.com/specimen/Montserrat)
+- **Font**: Georgia (System Font)
 - **E-ink Driver**: [Waveshare](https://www.waveshare.com/)
 
 ## License
