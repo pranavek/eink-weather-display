@@ -106,51 +106,64 @@ class DisplayService:
         # Divider between top and bottom
         draw.line((0, 65, width, 65), fill=0, width=2)
         
-        # --- Forecast (Bottom Half) ---
-        # We have daily data: time, weathercode, temperature_2m_max, temperature_2m_min
-        # We want to show today, tomorrow, day after (3 days)
+        # --- Details & Recommendations (Bottom Half) ---
+        # Available Y: 67 to 122 (55px height)
+        # 3 lines of ~18px
         
-        daily_time = daily.get('time', [])
-        daily_code = daily.get('weathercode', [])
-        daily_max = daily.get('temperature_2m_max', [])
-        daily_min = daily.get('temperature_2m_min', [])
+        # Data preparation
+        feels_like = current.get('apparent_temperature')
+        uv_index = daily.get('uv_index_max', [0])[0]
+        sunset_str = daily.get('sunset', [''])[0]
+        sunset_time = ""
+        if sunset_str:
+            try:
+                # Format: 2023-10-27T18:00
+                dt_sunset = datetime.strptime(sunset_str, '%Y-%m-%dT%H:%M')
+                sunset_time = dt_sunset.strftime('%H:%M')
+            except ValueError:
+                sunset_time = sunset_str
+                
+        precip_prob = daily.get('precipitation_probability_max', [0])[0]
+        weather_code = current.get('weathercode', 0)
         
-        # Column width = width / 3
-        col_width = width // 3
+        # Recommendations Logic
+        # Umbrella
+        umbrella_rec = "No Umb"
+        # Codes 51-67 (drizzle/rain), 80-82 (showers), 95-99 (thunderstorm)
+        is_raining = (51 <= weather_code <= 67) or (80 <= weather_code <= 82) or (95 <= weather_code <= 99)
+        if precip_prob > 30 or is_raining:
+            umbrella_rec = "Take Umb"
+            
+        # Clothing
+        clothing_rec = "T-Shirt"
+        if feels_like < 10:
+            clothing_rec = "Coat"
+        elif feels_like < 20:
+            clothing_rec = "Jacket"
+            
+        # Outdoors
+        outdoor_score = "Good"
+        # Simple logic: Bad if raining, very high wind, or extreme temps
+        if is_raining or feels_like > 35 or feels_like < -5 or wind_kmh > 30:
+            outdoor_score = "Poor"
+        elif 61 <= weather_code <= 67: # Rain
+             outdoor_score = "Poor"
+             
+        # Draw Lines
+        line_height = 18
+        y_start = 67
         
-        # Skip today (index 0), show next 3 days (indices 1, 2, 3)
-        start_idx = 1
-        end_idx = min(start_idx + 3, len(daily_time))
+        # Line 1: Feels Like | UV | Sunset
+        line1_text = f"Feel: {int(feels_like)}°C  UV: {uv_index}  Sun: {sunset_time}"
+        draw.text((5, y_start), line1_text, font=self.font_detail, fill=0)
         
-        for i in range(start_idx, end_idx):
-            # Calculate display index (0, 1, 2) for positioning
-            display_i = i - start_idx
-            day_x = display_i * col_width
-            
-            # Date -> Day name
-            date_str = daily_time[i]
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            day_name = date_obj.strftime('%a') # Mon, Tue...
-            
-            # Center text in column
-            # Day Name
-            bbox = draw.textbbox((0, 0), day_name, font=self.font_forecast)
-            w = bbox[2] - bbox[0]
-            draw.text((day_x + (col_width - w)//2, 70), day_name, font=self.font_forecast, fill=0)
-            
-            # Icon
-            small_icon_size = 25
-            # For forecast, assume daytime (is_day=1) since we don't have hourly data
-            icon_drawer.draw_icon_for_code(daily_code[i], day_x + (col_width - small_icon_size)//2, 90, small_icon_size, is_day=1)
-            
-            # Temp Range (Max/Min)
-            # e.g. 20/15
-            t_max = daily_max[i]
-            t_min = daily_min[i]
-            temp_range = f"{int(t_max)}/{int(t_min)}"
-            bbox = draw.textbbox((0, 0), temp_range, font=self.font_forecast)
-            w = bbox[2] - bbox[0]
-            draw.text((day_x + (col_width - w)//2, 125), temp_range, font=self.font_forecast, fill=0)
+        # Line 2: Umbrella | Clothing
+        line2_text = f"Rec: {umbrella_rec}, {clothing_rec}"
+        draw.text((5, y_start + line_height), line2_text, font=self.font_detail, fill=0)
+        
+        # Line 3: Outdoor Status
+        line3_text = f"Outdoors: {outdoor_score}"
+        draw.text((5, y_start + line_height * 2), line3_text, font=self.font_detail, fill=0)
 
 
         # Rotate image 180 degrees
@@ -165,4 +178,18 @@ class DisplayService:
 if __name__ == "__main__":
     ds = DisplayService()
     # Test data
-    ds.update_display({'temperature': 20, 'windspeed': 10, 'weathercode': 1})
+    test_data = {
+        'current': {
+            'temperature': 20,
+            'apparent_temperature': 18,
+            'windspeed': 10,
+            'weathercode': 1,
+            'is_day': 1
+        },
+        'daily': {
+            'uv_index_max': [5],
+            'sunset': ['2023-10-27T18:30'],
+            'precipitation_probability_max': [10]
+        }
+    }
+    ds.update_display(test_data)
