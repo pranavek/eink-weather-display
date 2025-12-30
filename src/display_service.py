@@ -1,8 +1,10 @@
 import os
 import sys
 import logging
-from PIL import Image, ImageDraw, ImageFont
+import math
+import time
 from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
 
 # Ensure lib is in path if running directly (for testing)
 if __name__ == "__main__":
@@ -37,32 +39,95 @@ class DisplayService:
         self.epd = epd2in13_V4.EPD()
         self.epd.init()
         self.epd.Clear(0xFF)
-        # Use default font for simplicity
-        self.font = ImageFont.load_default()
-        # Try to load Montserrat fonts
+        
+        # Load Fonts
         font_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts')
         try:
-            self.font_location = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 24)
-            self.font_temp = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 36)
-            self.font_detail = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Regular.ttf"), 18)
-            self.font_forecast = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 22)
+            self.font_u8g2_8 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Regular.ttf"), 10) # Roughly equivalent to u8g2_font_helvB08
+            self.font_u8g2_10 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 12)
+            self.font_u8g2_12 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 14)
+            self.font_u8g2_14 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 16)
+            self.font_u8g2_24 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 28)
+            
+            self.font_weather = os.path.join(font_dir, 'weathericons-regular-webfont.ttf')
         except IOError:
-            self.font_location = ImageFont.load_default()
-            self.font_temp = ImageFont.load_default()
-            self.font_detail = ImageFont.load_default()
-            self.font_forecast = ImageFont.load_default()
+            print("Warning: Fonts not found, using default.")
+            self.font_u8g2_8 = ImageFont.load_default()
+            self.font_u8g2_10 = ImageFont.load_default()
+            self.font_u8g2_12 = ImageFont.load_default()
+            self.font_u8g2_14 = ImageFont.load_default()
+            self.font_u8g2_24 = ImageFont.load_default()
+            self.font_weather = None
+
+    def _get_moon_phase(self, d, m, y):
+        """
+        Calculates moon phase (0-7).
+        0: New, 4: Full.
+        """
+        if m < 3:
+            y -= 1
+            m += 12
+        m += 1
+        c = 365.25 * y
+        e = 30.6 * m
+        jd = c + e + d - 694039.09
+        jd /= 29.53059
+        b = int(jd)
+        jd -= b
+        b = int(jd * 8 + 0.5)
+        b = b & 7
+        return b
+
+    def _draw_moon(self, draw, x, y, d, m, y_year, diameter=30):
+        phase_idx = self._get_moon_phase(d, m, y_year)
+        
+        # Simple circle for moon base
+        draw.ellipse((x, y, x + diameter, y + diameter), outline=0)
+        
+        # Ideally we draw the phase, but simpler is to just draw a circle and maybe text
+        # Or fill it based on phase.
+        # Implementation of full complex moon phase drawing with arcs in PIL is non-trivial.
+        # I will simplify to: Empty Circle (New), Filled Circle (Full), Half Filled (Quarter).
+        
+        if phase_idx == 0: # New
+            pass # Outline only
+        elif phase_idx == 4: # Full
+            draw.ellipse((x, y, x + diameter, y + diameter), fill=0)
+        elif phase_idx in [1, 2, 3]: # Waxing
+            draw.chord((x, y, x + diameter, y + diameter), 270, 90, fill=0) # Right Side filled
+        elif phase_idx in [5, 6, 7]: # Waning
+            draw.chord((x, y, x + diameter, y + diameter), 90, 270, fill=0) # Left Side filled
+
+    def _draw_arrow(self, draw, x, y, length, angle, arrow_head_size=3):
+        # Angle 0 is North (Up) in Meteorology? usually.
+        # Convert to math angle (0 is East, counter-clockwise)
+        # Met: 0=N, 90=E, 180=S, 270=W
+        # PIL: 0=E, 90=S (Clockwise)
+        
+        # Convert Met angle to PIL angle
+        # 0(N) -> 270(PIL)
+        # 90(E) -> 0(PIL)
+        # 180(S) -> 90(PIL)
+        # 270(W) -> 180(PIL)
+        pil_angle = (angle - 90) * (math.pi / 180.0) 
+        
+        end_x = x + length * math.cos(pil_angle)
+        end_y = y + length * math.sin(pil_angle)
+        
+        draw.line((x, y, end_x, end_y), fill=0, width=2)
+        
+        # Draw Arrow head
+        # Not implemented for brevity, line is sufficient for small icon
+        draw.ellipse((end_x-2, end_y-2, end_x+2, end_y+2), fill=0)
 
     def update_display(self, weather_data, location_name="Weather"):
         if not weather_data:
             return
-        
+            
         current = weather_data.get('current', {})
         daily = weather_data.get('daily', {})
-        
-        if not current:
-            return
+        hourly = weather_data.get('hourly', {})
 
-        # EPD_WIDTH = 122, EPD_HEIGHT = 250
         # Landscape mode: 250x122
         width = self.epd.height
         height = self.epd.width
@@ -70,106 +135,135 @@ class DisplayService:
         image = Image.new('1', (width, height), 255)
         draw = ImageDraw.Draw(image)
         
-        # --- Current Weather (Top Half) ---
-        # Icon
-        icon_size = 40
-        icon_x = 5
-        icon_y = 5
+        # --- Header Section (0 - 11) ---
+        now = datetime.now()
+        date_str = now.strftime("%d.%m.%Y")
         
-        # Initialize icon drawer with weather icons font
-        font_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts', 'weathericons-regular-webfont.ttf')
-        icon_drawer = IconDrawer(draw, font_path, icon_size)
+        # Centered City Name
+        text_bbox = draw.textbbox((0, 0), location_name, font=self.font_u8g2_8)
+        text_width = text_bbox[2] - text_bbox[0]
+        draw.text(((width - text_width) / 2, 0), location_name, font=self.font_u8g2_8, fill=0)
         
-        code = current.get('weathercode')
-        is_day = current.get('is_day', 1)
-        icon_drawer.draw_icon_for_code(code, icon_x, icon_y, icon_size, is_day)
+        # Right aligned Date
+        text_bbox = draw.textbbox((0, 0), date_str, font=self.font_u8g2_8)
+        text_width = text_bbox[2] - text_bbox[0]
+        draw.text((width - text_width, 0), date_str, font=self.font_u8g2_8, fill=0)
         
-        # Temp
-        temp_c = current.get('temperature')
-        temp_f = (temp_c * 9/5) + 32
-        temp_text = f"{temp_c}°C / {int(temp_f)}°F"
+        draw.line((0, 11, width, 11), fill=0)
         
-        # Use a slightly smaller font for temp to fit nicely
-        draw.text((65, 10), temp_text, font=self.font_location, fill=0)
+        # --- Main Weather Section (12 - 72) ---
         
-        # Wind
-        wind_kmh = current.get('windspeed')
-        wind_mph = wind_kmh * 0.621371  # Convert km/h to mph
-        wind_dir = current.get('winddirection', 0)
-        def get_cardinal(d):
-            dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-            ix = round(d / (360. / len(dirs)))
-            return dirs[ix % len(dirs)]
-        wind_cardinal = get_cardinal(wind_dir)
-        draw.text((65, 40), f"W: {int(wind_mph)} mph {wind_cardinal}", font=self.font_detail, fill=0)
+        # 1. Temp & Humidity (Left Column) -> x=5
+        # Stacked vertically to save width
+        temp = current.get('temperature', 0)
+        hum = current.get('humidity', 0)
+        
+        temp_str = f"{temp:.1f}°"
+        hum_str = f"{hum:.0f}%" 
+        
+        draw.text((5, 20), temp_str, font=self.font_u8g2_24, fill=0)
+        draw.text((5, 50), hum_str, font=self.font_u8g2_14, fill=0)
+        
+        # 2. Weather Icon (Center-Left) -> x=90
+        # Previously x=117 overlap with hum. Now we have space since hum is moved to x=5
+        icon_drawer = IconDrawer(draw, self.font_weather, 40)
+        icon_drawer.draw_icon_for_code(current.get('weathercode', 0), 90, 25, 40, current.get('is_day', 1))
+        
+        # 3. Astronomy (Center-Right) -> x=138 (Moved left slightly)
+        sunrise = daily.get('sunrise', [''])[0]
+        sunset = daily.get('sunset', [''])[0]
+        
+        if sunrise and 'T' in sunrise: sunrise = sunrise.split('T')[1][:5]
+        if sunset and 'T' in sunset: sunset = sunset.split('T')[1][:5]
+        
+        # Shortened labels
+        draw.text((138, 15), f"R {sunrise}", font=self.font_u8g2_8, fill=0)
+        draw.text((138, 25), f"S {sunset}", font=self.font_u8g2_8, fill=0)
+        
+        # Moon Phase Text
+        phase_idx = self._get_moon_phase(now.day, now.month, now.year)
+        phases = ["New", "WaxCres", "1stQtr", "WaxGib", "Full", "WanGib", "3rdQtr", "WanCres"]
+        moon_text = phases[phase_idx]
+        draw.text((138, 35), moon_text, font=self.font_u8g2_8, fill=0)
+        
+        # Draw Moon Icon -> x=186 (Moved left), diameter=28
+        self._draw_moon(draw, 186, 20, now.day, now.month, now.year, diameter=28)
 
-        # Divider between top and bottom
-        draw.line((0, 65, width, 65), fill=0, width=2)
+        # 4. Wind (Moved to Bottom Right) -> x=220
+        # Placeholder strictly to remove it from here
+        pass
+
+        # Separator Line for forecast
+        draw.line((0, 72, 250, 72), fill=0)
         
-        # --- Details & Recommendations (Bottom Half) ---
-        # Available Y: 67 to 122 (55px height)
-        # 3 lines of ~18px
+        # --- Forecast Section (72 - 122) ---
+        # 5 Columns, 44px wide each.
+        # Forecast data from hourly
+        hourly_temp = hourly.get('temperature_2m', [])
+        hourly_time = hourly.get('time', [])
+        hourly_code = hourly.get('weathercode', [])
         
-        # Data preparation
-        feels_like = current.get('apparent_temperature')
-        uv_index = daily.get('uv_index_max', [0])[0]
-        sunset_str = daily.get('sunset', [''])[0]
-        sunset_time = ""
-        if sunset_str:
-            try:
-                # Format: 2023-10-27T18:00
-                dt_sunset = datetime.strptime(sunset_str, '%Y-%m-%dT%H:%M')
-                sunset_time = dt_sunset.strftime('%H:%M')
-            except ValueError:
-                sunset_time = sunset_str
+        # Find next 5 intervals of 3 hours
+        # Assume hourly data starts from 00:00 of today or includes current hour. 
+        # We need to find the index closest to now, then +3, +6...
+        start_idx = 0
+        current_hour_str = now.strftime("%Y-%m-%dT%H:00")
+        
+        # Simple search for current hour
+        for i, t in enumerate(hourly_time):
+            if t >= current_hour_str:
+                start_idx = i
+                break
                 
-        precip_prob = daily.get('precipitation_probability_max', [0])[0]
-        weather_code = current.get('weathercode', 0)
+        forecast_indices = [start_idx + 3, start_idx + 6, start_idx + 9, start_idx + 12, start_idx + 15]
         
-        # Recommendations Logic
-        # Umbrella
-        umbrella_rec = "No Umb"
-        # Codes 51-67 (drizzle/rain), 80-82 (showers), 95-99 (thunderstorm)
-        is_raining = (51 <= weather_code <= 67) or (80 <= weather_code <= 82) or (95 <= weather_code <= 99)
-        if precip_prob > 30 or is_raining:
-            umbrella_rec = "Take Umb"
+        for i, idx in enumerate(forecast_indices):
+            if idx >= len(hourly_temp): break
             
-        # Clothing
-        clothing_rec = "T-Shirt"
-        if feels_like < 10:
-            clothing_rec = "Coat"
-        elif feels_like < 20:
-            clothing_rec = "Jacket"
+            x_offset = i * 44
             
-        # Outdoors
-        outdoor_score = "Good"
-        # Simple logic: Bad if raining, very high wind, or extreme temps
-        if is_raining or feels_like > 35 or feels_like < -5 or wind_kmh > 30:
-            outdoor_score = "Poor"
-        elif 61 <= weather_code <= 67: # Rain
-             outdoor_score = "Poor"
-             
-        # Draw Lines
-        line_height = 18
-        y_start = 67
+            # Time 
+            time_val = hourly_time[idx].split('T')[1][:5]
+            draw.text((x_offset + 5, 75), time_val, font=self.font_u8g2_8, fill=0)
+            
+            # Icon
+            code = hourly_code[idx]
+            # Small icon for forecast
+            icon_drawer_small = IconDrawer(draw, self.font_weather, 20)
+            # Determine is_day for forecast? Simple logic: 6-18 is day
+            h_int = int(time_val.split(':')[0])
+            f_is_day = 1 if 6 <= h_int <= 18 else 0
+            icon_drawer_small.draw_icon_for_code(code, x_offset + 12, 85, 20, f_is_day)
+            
+            # Temp
+            t_val = hourly_temp[idx]
+            draw.text((x_offset + 5, 108), f"{int(t_val)}°", font=self.font_u8g2_10, fill=0)
+            
+            # Vertical Separator
+            draw.line((x_offset + 44, 72, x_offset + 44, 122), fill=0)
+
+        # --- Wind Section (Bottom Right) ---
+        # Moves to x=220 (after 5th forecast column)
+        wind_speed = current.get('windspeed', 0)
+        wind_dir = current.get('winddirection', 0)
         
-        # Line 1: Feels Like | UV | Sunset
-        line1_text = f"Feel: {int(feels_like)}°C  UV: {uv_index}  Sun: {sunset_time}"
-        draw.text((5, y_start), line1_text, font=self.font_detail, fill=0)
+        wx = 220
+        wy = 75
         
-        # Line 2: Umbrella | Clothing
-        line2_text = f"Rec: {umbrella_rec}, {clothing_rec}"
-        draw.text((5, y_start + line_height), line2_text, font=self.font_detail, fill=0)
-        
-        # Line 3: Outdoor Status
-        line3_text = f"Outdoors: {outdoor_score}"
-        draw.text((5, y_start + line_height * 2), line3_text, font=self.font_detail, fill=0)
+        # Adjusted coordinates for small box
+        self._draw_arrow(draw, wx + 15, wy + 10, 10, wind_dir)
+        draw.text((wx + 5, wy + 20), f"{int(wind_speed)}", font=self.font_u8g2_10, fill=0)
+        draw.text((wx + 5, wy + 32), "kmh", font=self.font_u8g2_8, fill=0)
 
 
-        # Rotate image 180 degrees
+        # Rotate 180
         image = image.rotate(180)
         
+        # Display
         self.epd.display(self.epd.getbuffer(image))
+        
+        # DEBUG: Save image for verification
+        image.save("last_display.png")
 
     def clear(self):
         self.epd.Clear(0xFF)
@@ -177,19 +271,27 @@ class DisplayService:
 
 if __name__ == "__main__":
     ds = DisplayService()
-    # Test data
+    # Mock Data
     test_data = {
         'current': {
-            'temperature': 20,
-            'apparent_temperature': 18,
-            'windspeed': 10,
+            'temperature': 22.5,
+            'humidity': 60,
             'weathercode': 1,
-            'is_day': 1
+            'is_day': 1,
+            'windspeed': 15,
+            'winddirection': 180
         },
         'daily': {
-            'uv_index_max': [5],
-            'sunset': ['2023-10-27T18:30'],
-            'precipitation_probability_max': [10]
+            'sunrise': ['2023-10-27T06:30'],
+            'sunset': ['2023-10-27T18:45'],
+        },
+        'hourly': {
+            'time': [f"2023-10-27T{h:02d}:00" for h in range(24)] + [f"2023-10-28T{h:02d}:00" for h in range(24)],
+            'temperature_2m': [20 + (i%5) for i in range(48)],
+            'weathercode': [1 for _ in range(48)]
         }
     }
-    ds.update_display(test_data)
+    # Update current time in mock to match "now" for test
+    now_h = datetime.now().hour
+    # Just run it
+    ds.update_display(test_data, "New York")

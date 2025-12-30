@@ -12,6 +12,7 @@ class WeatherService:
             "longitude": lon if lon is not None else self.lon,
             "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m",
             "daily": "weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max",
+            "hourly": "temperature_2m,weather_code",
             "timezone": "auto"
         }
         try:
@@ -25,13 +26,15 @@ class WeatherService:
                 "current": {
                     "temperature": current_data.get("temperature_2m"),
                     "apparent_temperature": current_data.get("apparent_temperature"),
+                    "humidity": current_data.get("relative_humidity_2m"),
                     "windspeed": current_data.get("wind_speed_10m"),
                     "winddirection": current_data.get("wind_direction_10m"),
                     "weathercode": current_data.get("weather_code"),
                     "is_day": 1 if current_data.get("is_day") else 0,
                     "time": current_data.get("time")
                 },
-                "daily": data.get("daily")
+                "daily": data.get("daily"),
+                "hourly": data.get("hourly")
             }
         except Exception as e:
             print(f"Error fetching weather: {e}")
