@@ -201,7 +201,8 @@ class DisplayService:
         # Forecast data from hourly
         hourly_temp = hourly.get('temperature_2m', [])
         hourly_time = hourly.get('time', [])
-        hourly_code = hourly.get('weathercode', [])
+        # OpenMeteo returns 'weather_code' for hourly, but sometimes 'weathercode'. Try both.
+        hourly_code = hourly.get('weather_code', hourly.get('weathercode', []))
         
         # Find next 5 intervals of 3 hours
         # Assume hourly data starts from 00:00 of today or includes current hour. 
@@ -218,7 +219,7 @@ class DisplayService:
         forecast_indices = [start_idx + 3, start_idx + 6, start_idx + 9, start_idx + 12, start_idx + 15]
         
         for i, idx in enumerate(forecast_indices):
-            if idx >= len(hourly_temp): break
+            if idx >= len(hourly_temp) or idx >= len(hourly_code): break
             
             x_offset = i * 44
             
