@@ -6,16 +6,17 @@ A Python-based weather display application for Waveshare e-ink displays (2.13" V
 
 ## Features
 
-- 📊 **Current Weather** - Temperature (°C/°F), wind speed (km/h & mph), and conditions
-- ℹ️ **Details & Recommendations** - UV, Sunset, Feels Like, and smart recommendations
-- 🎨 **Professional Design** - Weather-icons font for icons, Georgia font for text
-- 🌓 **Day/Night Icons** - Appropriate weather icons based on time of day
+- 📊 **Current Weather** - Temperature (°C/°F), humidity, and conditions
+- 🕒 **3-Hour Forecast** - 5-column forecast intervals showing predicted conditions and temperature
+- 🌓 **Astronomy** - Sunrise/Sunset times and current Moon Phase (Icon + Name)
+- 💨 **Wind Information** - Wind speed (km/h) and direction arrow
+- 🎨 **Professional Design** - Weather-icons font for icons, Montserrat font for text
 - 🔄 **Auto-Updates** - Refreshes every 60 minutes
 - 🌍 **Multi-Location** - Support for multiple locations (configurable)
 
 ## Hardware Requirements
 
-- Raspberry Pi (any model with GPIO)
+- Raspberry Pi (any model with GPIO) or ESP32
 - Waveshare 2.13" e-Paper Display V4
 - Internet connection for weather API access
 
@@ -43,14 +44,10 @@ pip3 install -r requirements.txt
 
 ### 3. Download Fonts
 
-The required fonts should already be in the `fonts/` directory:
+The required fonts should be in the `fonts/` directory:
 - `weathericons-regular-webfont.ttf` - Weather icons
 - `Montserrat-Bold.ttf` - Bold text
 - `Montserrat-Regular.ttf` - Regular text
-
-If missing, download them:
-- Weather Icons: [erikflowers/weather-icons](https://github.com/erikflowers/weather-icons)
-- Montserrat: [Google Fonts](https://fonts.google.com/specimen/Montserrat)
 
 ### 4. Configure Location
 
@@ -83,58 +80,21 @@ Edit `weather-display.service` to match your setup:
 ```bash
 # Copy service file
 sudo cp weather-display.service /etc/systemd/system/
-
-# Set permissions
-sudo chmod 644 /etc/systemd/system/weather-display.service
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable service (start on boot)
-sudo systemctl enable weather-display.service
-
-# Start service
-sudo systemctl start weather-display.service
-```
-
-### 3. Manage Service
-
-```bash
-# Check status
-sudo systemctl status weather-display.service
-
-# View logs
-sudo journalctl -u weather-display.service -f
-
-# Restart service
-sudo systemctl restart weather-display.service
-
-# Stop service
-sudo systemctl stop weather-display.service
-
-# Disable auto-start
-sudo systemctl disable weather-display.service
 ```
 
 ## Project Structure
 
 ```
-weather_display/
+weather/
 ├── fonts/                          # Font files
-│   ├── weathericons-regular-webfont.ttf
-│   ├── Montserrat-Bold.ttf
-│   └── Montserrat-Regular.ttf
 ├── lib/                            # Waveshare e-ink driver
-│   └── waveshare_epd/
 ├── src/                            # Source code
-│   ├── __init__.py
 │   ├── main.py                     # Main application
 │   ├── weather_service.py          # Weather API client
 │   ├── display_service.py          # E-ink display manager
-│   └── icons.py                    # Weather icon renderer
+│   ├── icons.py                    # Weather icon renderer
 ├── requirements.txt                # Python dependencies
 ├── weather-display.service         # Systemd service file
-├── INSTALL_SERVICE.md             # Service installation guide
 └── README.md                       # This file
 ```
 
@@ -142,13 +102,19 @@ weather_display/
 
 ### Weather API
 
-This project uses the [Open-Meteo API](https://open-meteo.com/) which is free and doesn't require an API key.
+This project uses the [Open-Meteo API](https://open-meteo.com/) which is free and doesn't require an API key. It fetches current, hourly (for forecast), and daily (for astronomy) data.
 
 ### Display Layout
 
-The display is divided into two sections:
-- **Top Half**: Current weather with large icon, temperature, and wind information
-- **Bottom Half**: Daily details (UV, Sunset, Feels Like) and recommendations (Umbrella, Clothing)
+The display is optimized for a 250x122 landscape resolution (2.13" display) and is divided into three sections:
+- **Header**: City name and current date
+- **Main Section**: 
+    - Left: Current temperature and humidity
+    - Center: Large condition icon
+    - Right: Astronomy (Sunrise/Sunset) and Moon Phase (Icon + Status)
+- **Forecast Section (Bottom Row)**: 
+    - Five 3-hour forecast modules (Time, Icon, Temp)
+    - Wind speed and direction arrow (Far Right)
 
 ### Update Frequency
 
