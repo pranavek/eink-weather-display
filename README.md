@@ -4,6 +4,8 @@ A Python-based weather display application for Waveshare e-ink displays (2.13" V
 
 ![Weather Display](assets/weather_eink.jpg)
 
+Inspired by https://github.com/Taikun/WeActStudioEpaper2.13inch/tree/main
+
 ## Features
 
 - 📊 **Current Weather** - Temperature (°C/°F), humidity, and conditions
