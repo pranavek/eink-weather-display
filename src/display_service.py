@@ -206,12 +206,6 @@ class DisplayService:
             tx = ast_x + _wi(0xf019, ast_x, 52)
             draw.text((tx, 52), f"Rain: {int(precip)}%", font=self.font_u8g2_8, fill=0)
 
-        # Today's high / low
-        t_max = daily.get('temperature_2m_max', [None])[0]
-        t_min = daily.get('temperature_2m_min', [None])[0]
-        if t_max is not None and t_min is not None:
-            draw.text((ast_x, 64), f"H:{int(round(t_max))}\u00b0 L:{int(round(t_min))}\u00b0",
-                      font=self.font_u8g2_8, fill=0)
 
         # ======================================================== SEPARATOR ==
         draw.line((0, 72, width, 72), fill=0)
@@ -304,8 +298,6 @@ if __name__ == "__main__":
             'sunset':  ['2023-10-27T18:45'],
             'uv_index_max': [7.2],
             'precipitation_probability_max': [30],
-            'temperature_2m_max': [28.3],
-            'temperature_2m_min': [17.8],
         },
         'hourly': {
             'time': [f"2023-10-27T{h:02d}:00" for h in range(24)] +
