@@ -44,16 +44,16 @@ class DisplayService:
         # Load Fonts
         font_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts')
         try:
-            self.font_u8g2_8  = ImageFont.truetype(os.path.join(font_dir, "Inter-Regular.ttf"), 10)
-            self.font_u8g2_10 = ImageFont.truetype(os.path.join(font_dir, "DejaVuSansMono-Bold.ttf"), 12)
-            self.font_u8g2_12 = ImageFont.truetype(os.path.join(font_dir, "Inter-Bold.ttf"), 14)
-            self.font_u8g2_14 = ImageFont.truetype(os.path.join(font_dir, "Inter-Bold.ttf"), 16)
-            self.font_u8g2_24 = ImageFont.truetype(os.path.join(font_dir, "Inter-Bold.ttf"), 28)
-            self.font_main_temp = ImageFont.truetype(os.path.join(font_dir, "Inter-Bold.ttf"), 20)
+            self.font_u8g2_8  = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Regular.ttf"), 10)
+            self.font_u8g2_10 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 12)
+            self.font_u8g2_12 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 14)
+            self.font_u8g2_14 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 16)
+            self.font_u8g2_24 = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 28)
+            self.font_main_temp = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 20)
 
             self.font_weather = os.path.join(font_dir, 'weathericons-regular-webfont.ttf')
             self.wi_font_small = ImageFont.truetype(self.font_weather, 11)
-            self.font_rc = ImageFont.truetype(os.path.join(font_dir, "Inter-Bold.ttf"), 11)
+            self.font_rc = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 11)
         except IOError:
             print("Warning: Fonts not found, using default.")
             self.font_u8g2_8  = ImageFont.load_default()
