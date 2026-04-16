@@ -52,6 +52,7 @@ class DisplayService:
             self.font_main_temp = ImageFont.truetype(os.path.join(font_dir, "Montserrat-Bold.ttf"), 20)
 
             self.font_weather = os.path.join(font_dir, 'weathericons-regular-webfont.ttf')
+            self.wi_font_small = ImageFont.truetype(self.font_weather, 10)
         except IOError:
             print("Warning: Fonts not found, using default.")
             self.font_u8g2_8  = ImageFont.load_default()
@@ -61,6 +62,7 @@ class DisplayService:
             self.font_u8g2_24 = ImageFont.load_default()
             self.font_main_temp = ImageFont.load_default()
             self.font_weather = None
+            self.wi_font_small = ImageFont.load_default()
 
     # ------------------------------------------------------------------ helpers
 
@@ -178,11 +180,31 @@ class DisplayService:
             sunset = sunset.split('T')[1][:5]
 
         ast_x = 159
-        draw.text((ast_x, 14), f"Feels: {feels:.1f}\u00b0", font=self.font_u8g2_8, fill=0)
+
+        def _wi(char_cp, x, y):
+            """Draw one weather-icon glyph; return its rendered pixel width + gap."""
+            ch = chr(char_cp)
+            draw.text((x, y), ch, font=self.wi_font_small, fill=0)
+            return draw.textbbox((0, 0), ch, font=self.wi_font_small)[2] + 3
+
+        # Feels-like
+        tx = ast_x + _wi(0xf055, ast_x, 14)
+        draw.text((tx, 14), f"Feels: {feels:.1f}\u00b0", font=self.font_u8g2_8, fill=0)
+
+        # Sunrise / Sunset — unchanged
         draw.text((ast_x, 26), f"\u2191 {sunrise} / \u2193 {sunset}", font=self.font_u8g2_8, fill=0)
+
+        # UV index
         uv = daily.get('uv_index_max', [None])[0]
         if uv is not None:
-            draw.text((ast_x, 40), f"UV: {int(round(uv))}", font=self.font_u8g2_8, fill=0)
+            tx = ast_x + _wi(0xf00d, ast_x, 40)
+            draw.text((tx, 40), f"UV: {int(round(uv))}", font=self.font_u8g2_8, fill=0)
+
+        # Precipitation probability
+        precip = daily.get('precipitation_probability_max', [None])[0]
+        if precip is not None:
+            tx = ast_x + _wi(0xf019, ast_x, 52)
+            draw.text((tx, 52), f"Rain: {int(precip)}%", font=self.font_u8g2_8, fill=0)
 
         # ======================================================== SEPARATOR ==
         draw.line((0, 72, width, 72), fill=0)
@@ -274,6 +296,7 @@ if __name__ == "__main__":
             'sunrise': ['2023-10-27T06:30'],
             'sunset':  ['2023-10-27T18:45'],
             'uv_index_max': [7.2],
+            'precipitation_probability_max': [30],
         },
         'hourly': {
             'time': [f"2023-10-27T{h:02d}:00" for h in range(24)] +
